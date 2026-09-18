@@ -19,11 +19,27 @@ const fixtureSource = fileURLToPath(new URL('../', import.meta.url));
 const nxPackage = fileURLToPath(new URL('../../packages/nx/', import.meta.url));
 const nxCli = join(nxPackage, 'dist/bin/nx.js');
 const projectCount = 1110;
-const nodeArgs = [
-  ...getV8Flags(),
+const nodeArgs = getV8Flags();
+if (nodeArgs.includes('--perf-prof')) {
+  // Profiler writes must not invalidate the daemon's watched graph, and the
+  // files must survive fixture cleanup until CodSpeed symbolizes the run.
+  const profileDirectory =
+    process.env.CODSPEED_V8_LOG ??
+    process.env.CODSPEED_PROFILE_FOLDER ??
+    tmpdir();
+  mkdirSync(profileDirectory, { recursive: true });
+  nodeArgs.push(`--perf-prof-path=${profileDirectory}`);
+  if (!process.env.CODSPEED_V8_LOG) {
+    nodeArgs.push(
+      '--no-logfile-per-isolate',
+      `--logfile=${join(profileDirectory, 'codspeed-v8-%p.log')}`
+    );
+  }
+}
+nodeArgs.push(
   '--require',
-  fileURLToPath(new URL('./profile-subprocesses.cjs', import.meta.url)),
-];
+  fileURLToPath(new URL('./profile-subprocesses.cjs', import.meta.url))
+);
 
 export const graphCommand = ['show', 'projects', '--json'];
 export const cachedTasksCommand = [
