@@ -67,3 +67,38 @@ pnpm nx run benchmarks -- --set-baseline
 ## CI
 
 Benchmarks run as part of the affected target pipeline in CI (`nx affected --targets=...bench`). The goals in `goals.json` act as the regression gate.
+
+## CodSpeed benchmarks
+
+Run the CodSpeed suites from the repository root with Node 22 or 24:
+
+```bash
+pnpm nx run-many -p benchmarks -t codspeed-micro,codspeed-tinybench,codspeed-macro --parallel=1
+```
+
+These targets build the local Nx package first and never cache benchmark results. The existing hyperfine targets remain independent.
+
+| Target               | Workload                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `codspeed-micro`     | Vitest project matching across 2,000 projects, including tags, exclusions, and directories                     |
+| `codspeed-tinybench` | Tinybench `projectsToRun` pattern matching and exclusions across 10,000 projects                               |
+| `codspeed-macro`     | CLI graph computation across 1,110 projects, cold/warm with daemon on/off, plus cached task output restoration |
+
+The macro suite copies the checked-in fixture into temporary workspaces and invokes the built Nx CLI directly. It does not download a workspace or benchmark a published Nx version. Each walltime case takes 10 samples after one warmup iteration.
+
+- Cold cases reset Nx before **each sample**, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
+- Warm cases populate the graph before measurement. Daemon cases fail if Nx falls back to daemonless execution.
+- The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one.
+- Nx Cloud is disabled. Each case owns its cache and daemon, and removes its temporary workspace on completion.
+
+### CI and profiles
+
+`.github/workflows/codspeed.yml` runs on pull requests, pushes to `master`, and manual dispatches. It runs the micros and macros with CPU simulation, enabling subprocess tracking with CodSpeed runner v5.2.1. A separate macro job measures walltime on the `codspeed-macro-x64-ryzen-9950x-ubuntu-24-04` runner.
+
+The workflow pins Node 24 and the CodSpeed Node plugins. The plugins currently use `6.0.0-beta.2` for Node 22/24 and Vite 8 support. The macro preload forwards profiling flags to Nx's daemon and plugin processes; walltime keeps the JIT enabled. Rust builds retain debug information for native source locations.
+
+CodSpeed collects profiles automatically. With the pinned plugin, walltime profiles cover the entire sampling loop, including per-sample reset and validation hooks. Reported latency samples exclude those hooks.
+
+Download the workflow's `codspeed-macro-walltime-*` artifact to compare `results-codspeed-macro.json` between repeated runs of the same commit. The report contains each case's mean, standard deviation, and sample count; Vitest omits individual samples from its JSON report. Compare runs on the same runner label and Node version.
+
+The first successful `master` run establishes the baseline for that repository. A fork's baseline does not replace the upstream baseline; upstream needs a successful run after the workflow lands.

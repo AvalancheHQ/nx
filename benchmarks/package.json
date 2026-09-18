@@ -15,6 +15,30 @@
   },
   "nx": {
     "targets": {
+      "codspeed-micro": {
+        "command": "vitest bench --run --config benchmarks/micro/vitest.micro.config.mts",
+        "cache": false,
+        "parallelism": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "codspeed-tinybench": {
+        "command": "node benchmarks/micro/run-many.mjs",
+        "cache": false,
+        "parallelism": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "codspeed-macro": {
+        "command": "vitest bench --run --config benchmarks/macro/vitest.macro.config.mts",
+        "cache": false,
+        "parallelism": false,
+        "dependsOn": [
+          "^build"
+        ]
+      },
       "run": {
         "dependsOn": [
           "bench:version",
@@ -61,5 +85,11 @@
         ]
       }
     }
+  },
+  "devDependencies": {
+    "@codspeed/core": "6.0.0-beta.2",
+    "@codspeed/tinybench-plugin": "6.0.0-beta.2",
+    "@codspeed/vitest-plugin": "6.0.0-beta.2",
+    "tinybench": "4.1.0"
   }
 }
