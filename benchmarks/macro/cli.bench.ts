@@ -1,5 +1,4 @@
-import { getCodspeedRunnerMode } from '@codspeed/core';
-import { afterEach, beforeEach, bench, describe } from 'vitest';
+import { bench, describe } from 'vitest';
 import {
   BenchmarkWorkspace,
   cachedTasksCommand,
@@ -8,17 +7,12 @@ import {
 
 // Vitest uses its bundled Tinybench 2.x, independently of the standalone
 // Tinybench micros. setup/teardown run once per warmup/run phase, NOT per sample.
-// Install Tinybench's task hooks for walltime, and use suite hooks for CodSpeed's
-// analysis runner, which calls the benchmark directly instead of Task.run().
-// Both paths therefore prepare every invocation outside its timing boundary.
-// The beta.2 walltime profiler spans the full loop (including these hooks),
-// although the reported latency samples exclude the hooks.
+// Install per-sample task hooks to keep preparation and validation outside the
+// latency timer. The beta.2 walltime profile includes these hooks.
 function cliBenchmark(
   name: string,
   options: { daemon: boolean; cold?: boolean; cachedTasks?: boolean }
 ): void {
-  if (options.daemon && getCodspeedRunnerMode() === 'simulation') return;
-
   describe(name, () => {
     let workspace: BenchmarkWorkspace;
     let output: string;
@@ -45,9 +39,6 @@ function cliBenchmark(
       }
     }
 
-    beforeEach(prepareIteration);
-    afterEach(finishIteration);
-
     bench(
       options.cachedTasks
         ? 'run-many copy / all local-cache hits'
@@ -58,7 +49,6 @@ function cliBenchmark(
             options.cachedTasks ? cachedTasksCommand : graphCommand
           );
         } catch (error) {
-          // CodSpeed's analysis runner does not run teardown if fn() throws.
           workspace.close();
           throw error;
         }
@@ -78,11 +68,7 @@ function cliBenchmark(
               // Completion of this graph request is the readiness barrier.
               workspace.assertGraph(workspace.run(graphCommand));
             }
-            if (options.cachedTasks) {
-              // Priming launches 1,110 uncached tasks under Valgrind, outside
-              // measurement. Keep the shorter deadline for measured commands.
-              workspace.run(cachedTasksCommand, 1_800_000);
-            }
+            if (options.cachedTasks) workspace.run(cachedTasksCommand);
             if (!task)
               throw new Error('Vitest did not provide a Tinybench task');
             task.opts.beforeEach = prepareIteration;
