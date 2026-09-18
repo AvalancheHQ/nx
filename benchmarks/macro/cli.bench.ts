@@ -78,7 +78,11 @@ function cliBenchmark(
               // Completion of this graph request is the readiness barrier.
               workspace.assertGraph(workspace.run(graphCommand));
             }
-            if (options.cachedTasks) workspace.run(cachedTasksCommand);
+            if (options.cachedTasks) {
+              // Priming launches 1,110 uncached tasks under Valgrind, outside
+              // measurement. Keep the shorter deadline for measured commands.
+              workspace.run(cachedTasksCommand, 1_800_000);
+            }
             if (!task)
               throw new Error('Vitest did not provide a Tinybench task');
             task.opts.beforeEach = prepareIteration;

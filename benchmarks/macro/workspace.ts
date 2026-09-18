@@ -132,13 +132,13 @@ export class BenchmarkWorkspace {
     }
   }
 
-  run(args: string[]): string {
+  run(args: string[], timeoutMs = 300_000): string {
     return execFileSync(process.execPath, [...nodeArgs, nxCli, ...args], {
       cwd: this.root,
       env: this.env,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 300_000,
+      timeout: timeoutMs,
       maxBuffer: 32 * 1024 * 1024,
     });
   }
