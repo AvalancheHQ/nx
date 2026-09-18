@@ -84,25 +84,23 @@ These targets build the local Nx package first and never cache benchmark results
 | `codspeed-tinybench` | Tinybench `projectsToRun` pattern matching and exclusions across 10,000 projects                               |
 | `codspeed-macro`     | CLI graph computation across 1,110 projects, cold/warm with daemon on/off, plus cached task output restoration |
 
-The macro suite copies the checked-in fixture into temporary workspaces and invokes the built Nx CLI directly. It does not download a workspace or benchmark a published Nx version. Each walltime case takes 10 samples after one warmup iteration.
+The macro suite copies the checked-in fixture into temporary workspaces and invokes the built Nx CLI directly. It doesn't download a workspace or benchmark a published Nx version. Each walltime case takes 10 samples after one warmup iteration.
 
-- Cold cases reset Nx before **each sample**, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
+- Cold cases reset Nx before each sample, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
 - Warm cases populate the graph before measurement. Daemon cases fail if Nx falls back to daemonless execution.
-- The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one. Cache priming allows 30 minutes for simulation overhead, outside measurement. Measured commands retain a 5-minute timeout.
-- Nx Cloud is disabled. Each case owns its cache and daemon, and removes its temporary workspace on completion.
+- The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one.
+- Nx Cloud is disabled. Each case owns its cache and daemon and removes its temporary workspace on completion.
 
 ### CI and profiles
 
-`.github/workflows/codspeed.yml` runs on pull requests, pushes to `master`, and manual dispatches. It runs the micros and the three daemonless macros with CPU simulation, enabling subprocess tracking with CodSpeed runner v5.3.1. A separate macro job measures all five cases with walltime on the `codspeed-macro-x64-ryzen-9950x-ubuntu-24-04` runner.
+`.github/workflows/codspeed.yml` runs on pull requests, pushes to `master`, and manual dispatches. It measures the two microbenchmarks with CPU simulation and all five macrobenchmarks with walltime on the `codspeed-macro-x64-ryzen-9950x-ubuntu-24-04` runner. Both jobs use CodSpeed runner v5.3.1.
 
-The workflow pins Node 24 and the CodSpeed Node plugins. The plugins currently use `6.0.0-beta.2` for Node 22/24 and Vite 8 support. The Tinybench entry point relaunches Node with the plugin's required V8 flags when instrumentation is enabled. The macro preload forwards profiling flags to Nx's daemon and plugin processes; walltime keeps the JIT enabled. Rust builds retain debug information for native source locations.
+The workflow pins Node 24 and the CodSpeed Node plugins. The plugins currently use `6.0.0-beta.2` for Node 22/24 and Vite 8 support. The Tinybench entry point relaunches Node with the V8 flags required by the plugin when instrumentation is enabled. The macro preload forwards profiling flags to the Nx daemon and plugin processes. Walltime keeps the JIT enabled. Rust builds retain debug information for native source locations.
 
-Child-process V8 logs and JIT dumps stay outside the temporary workspace so profiling cannot trigger daemon graph rebuilds. They remain available after fixture cleanup for CodSpeed's symbolication.
+Child-process V8 logs and JIT dumps stay outside the temporary workspace so profiling cannot trigger daemon graph rebuilds. They remain available after fixture cleanup for symbolication.
 
 CodSpeed collects profiles automatically. With the pinned plugin, walltime profiles cover the entire sampling loop, including per-sample reset and validation hooks. Reported latency samples exclude those hooks.
 
-CPU simulation excludes daemon-enabled cases. Instrumentation is inherited at process creation, so it cannot start measurement in a daemon warmed during setup. A cold daemon also keeps collecting after the parent stops. Use the gen2 walltime results and profiles for daemon-enabled workloads.
+Download the workflow's `codspeed-macro-walltime-*` artifact to compare `results-codspeed-macro.json` between repeated runs of the same commit. The report contains each case's mean, standard deviation, and sample count. Vitest omits individual samples from its JSON report. Compare runs on the same runner label and Node version.
 
-Download the workflow's `codspeed-macro-walltime-*` artifact to compare `results-codspeed-macro.json` between repeated runs of the same commit. The report contains each case's mean, standard deviation, and sample count; Vitest omits individual samples from its JSON report. Compare runs on the same runner label and Node version.
-
-The first successful `master` run establishes the baseline for that repository. A fork's baseline does not replace the upstream baseline; upstream needs a successful run after the workflow lands.
+The first successful `master` run establishes the baseline for that repository. A fork's baseline doesn't replace the upstream baseline. Upstream needs a successful run after the workflow lands.
