@@ -88,7 +88,7 @@ The macro suite copies the checked-in fixture into temporary workspaces and invo
 
 - Cold cases reset Nx before **each sample**, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
 - Warm cases populate the graph before measurement. Daemon cases fail if Nx falls back to daemonless execution.
-- The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one.
+- The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one. Cache priming allows 30 minutes for simulation overhead, outside measurement. Measured commands retain a 5-minute timeout.
 - Nx Cloud is disabled. Each case owns its cache and daemon, and removes its temporary workspace on completion.
 
 ### CI and profiles
