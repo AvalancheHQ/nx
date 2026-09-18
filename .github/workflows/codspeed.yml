@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: codspeed-${{ github.event.pull_request.number || github.ref }}
+  group: codspeed-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
