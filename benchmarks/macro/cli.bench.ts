@@ -1,3 +1,4 @@
+import { getCodspeedRunnerMode } from '@codspeed/core';
 import { afterEach, beforeEach, bench, describe } from 'vitest';
 import {
   BenchmarkWorkspace,
@@ -16,6 +17,8 @@ function cliBenchmark(
   name: string,
   options: { daemon: boolean; cold?: boolean; cachedTasks?: boolean }
 ): void {
+  if (options.daemon && getCodspeedRunnerMode() === 'simulation') return;
+
   describe(name, () => {
     let workspace: BenchmarkWorkspace;
     let output: string;
