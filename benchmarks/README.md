@@ -93,9 +93,9 @@ The macro suite copies the checked-in fixture into temporary workspaces and invo
 
 ### CI and profiles
 
-`.github/workflows/codspeed.yml` runs on pull requests, pushes to `master`, and manual dispatches. It runs the micros and macros with CPU simulation, enabling subprocess tracking with CodSpeed runner v5.2.1. A separate macro job measures walltime on the `codspeed-macro-x64-ryzen-9950x-ubuntu-24-04` runner.
+`.github/workflows/codspeed.yml` runs on pull requests, pushes to `master`, and manual dispatches. It runs the micros and macros with CPU simulation, enabling subprocess tracking with CodSpeed runner v5.3.1. A separate macro job measures walltime on the `codspeed-macro-x64-ryzen-9950x-ubuntu-24-04` runner.
 
-The workflow pins Node 24 and the CodSpeed Node plugins. The plugins currently use `6.0.0-beta.2` for Node 22/24 and Vite 8 support. The macro preload forwards profiling flags to Nx's daemon and plugin processes; walltime keeps the JIT enabled. Rust builds retain debug information for native source locations.
+The workflow pins Node 24 and the CodSpeed Node plugins. The plugins currently use `6.0.0-beta.2` for Node 22/24 and Vite 8 support. The Tinybench entry point relaunches Node with the plugin's required V8 flags when instrumentation is enabled. The macro preload forwards profiling flags to Nx's daemon and plugin processes; walltime keeps the JIT enabled. Rust builds retain debug information for native source locations.
 
 Child-process V8 logs and JIT dumps stay outside the temporary workspace so profiling cannot trigger daemon graph rebuilds. They remain available after fixture cleanup for CodSpeed's symbolication.
 
