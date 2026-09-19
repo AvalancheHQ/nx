@@ -63,10 +63,12 @@ function cliBenchmark(
           workspace = new BenchmarkWorkspace(options.daemon);
           try {
             if (!options.cold) {
-              // Start AND populate the daemon from this instrumented runner's
-              // ancestry, never from workflow setup or an external nx process.
-              // Completion of this graph request is the readiness barrier.
-              workspace.assertGraph(workspace.run(graphCommand));
+              // Warm this phase's own workspace: Tinybench discards the warmup
+              // workspace before measurement. Start the daemon under this
+              // instrumented runner so child profiles remain available.
+              for (let request = 0; request < 5; request++) {
+                workspace.assertGraph(workspace.run(graphCommand));
+              }
             }
             if (options.cachedTasks) workspace.run(cachedTasksCommand);
             if (!task)
