@@ -54,7 +54,7 @@ function cliBenchmark(
         }
       },
       {
-        iterations: 10,
+        iterations: 30,
         time: 0,
         warmupIterations: 1,
         warmupTime: 0,

@@ -84,10 +84,10 @@ These targets build the local Nx package first and never cache benchmark results
 | `codspeed-tinybench` | Tinybench `projectsToRun` pattern matching and exclusions across 10,000 projects                               |
 | `codspeed-macro`     | CLI graph computation across 1,110 projects, cold/warm with daemon on/off, plus cached task output restoration |
 
-The macro suite copies the checked-in fixture into temporary workspaces and invokes the built Nx CLI directly. It doesn't download a workspace or benchmark a published Nx version. Each walltime case takes 10 samples after one warmup iteration.
+The macro suite copies the checked-in fixture into temporary workspaces and invokes the built Nx CLI directly. It doesn't download a workspace or benchmark a published Nx version. Each walltime case takes 30 samples after one warmup iteration.
 
 - Cold cases reset Nx before each sample, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
-- Warm cases populate the graph before measurement. Daemon cases fail if Nx falls back to daemonless execution.
+- Warm cases issue five untimed graph requests in their measurement workspace as well as their separate warmup workspace. Daemon cases fail if Nx falls back to daemonless execution.
 - The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one.
 - Nx Cloud is disabled. Each case owns its cache and daemon and removes its temporary workspace on completion.
 
@@ -101,6 +101,8 @@ Child-process V8 logs and JIT dumps stay outside the temporary workspace so prof
 
 CodSpeed collects profiles automatically. With the pinned plugin, walltime profiles cover the entire sampling loop, including per-sample reset and validation hooks. Reported latency samples exclude those hooks.
 
-Download the workflow's `codspeed-macro-walltime-*` artifact to compare `results-codspeed-macro.json` between repeated runs of the same commit. The report contains each case's mean, standard deviation, and sample count. Vitest omits individual samples from its JSON report. Compare runs on the same runner label and Node version.
+Download the workflow's `codspeed-macro-walltime-*` artifact to compare `results-codspeed-macro.json` between repeated runs of the same commit. The report contains each case's minimum, mean, standard deviation, and sample count. Vitest omits individual samples from its JSON report.
+
+For walltime stability, calculate the coefficient of variation (CV) across per-run minima: divide their sample standard deviation by their mean and multiply by 100. Keep the sample count, runner label, and Node version fixed. Increasing the sample count can lower the minimum without making the code faster, so establish a new baseline when changing it.
 
 The first successful `master` run establishes the baseline for that repository. A fork's baseline doesn't replace the upstream baseline. Upstream needs a successful run after the workflow lands.
