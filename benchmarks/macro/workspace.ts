@@ -36,7 +36,9 @@ if (nodeArgs.includes('--perf-prof')) {
     );
   }
 }
+// Keep property-key hashing reproducible while leaving the JIT enabled.
 nodeArgs.push(
+  '--hash-seed=1',
   '--require',
   fileURLToPath(new URL('./profile-subprocesses.cjs', import.meta.url))
 );
