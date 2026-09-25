@@ -1,0 +1,94 @@
+name: CodSpeed
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codspeed-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NX_NO_CLOUD: 'true'
+  NX_DAEMON: 'false'
+  NX_TUI: 'false'
+  CARGO_INCREMENTAL: '0'
+  # Keep Rust source locations in the profiles without changing optimization.
+  CARGO_PROFILE_RELEASE_DEBUG: '1'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  # CodSpeed's Node integration supports Node 22 and 24, not Node 26 yet.
+  NODE_VERSION: '24.21.0'
+
+jobs:
+  benchmarks:
+    name: ${{ matrix.suite }} (${{ matrix.mode }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: micro
+            mode: simulation
+            runner: ubuntu-24.04
+            targets: codspeed-micro,codspeed-tinybench
+          - suite: macro
+            mode: walltime
+            runner: codspeed-macro-x64-ryzen-9950x-ubuntu-24-04
+            targets: codspeed-macro
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up toolchains
+        uses: jdx/mise-action@146a28175021df8ca24f8ee1828cc2a60f980bd5 # v3
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+
+      - name: Locate pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: codspeed-pnpm-${{ runner.os }}-${{ runner.arch }}-${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Compilation and dependency installation must not enter the measurement.
+      - name: Build local Nx
+        run: pnpm nx build nx
+
+      - name: Measure benchmarks and collect profiles
+        uses: CodSpeedHQ/action@48820ecdc9112f8f10eab425853ccc461510c0dc # runner v5.3.1
+        with:
+          mode: ${{ matrix.mode }}
+          runner-version: '5.3.1'
+          run: pnpm nx run-many -p benchmarks -t ${{ matrix.targets }} --parallel=1 --excludeTaskDependencies --outputStyle=static
+
+      - name: Preserve benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codspeed-${{ matrix.suite }}-${{ matrix.mode }}-${{ github.run_attempt }}
+          path: |
+            benchmarks/results-codspeed-*.json
+            .codspeed/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

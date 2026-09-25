@@ -67,3 +67,61 @@ pnpm nx run benchmarks -- --set-baseline
 ## CI
 
 Benchmarks run as part of the affected target pipeline in CI (`nx affected --targets=...bench`). The goals in `goals.json` act as the regression gate.
+
+## CodSpeed benchmarks
+
+Run the CodSpeed suites from the repository root with Node 22 or 24:
+
+```bash
+pnpm nx run-many -p benchmarks -t codspeed-micro,codspeed-tinybench,codspeed-macro --parallel=1
+```
+
+These targets build the local Nx package first and never cache benchmark results. The existing hyperfine targets remain independent.
+
+| Target               | Workload                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `codspeed-micro`     | Vitest project matching across 2,000 projects, including tags, exclusions, and directories                      |
+| `codspeed-tinybench` | Tinybench `projectsToRun` pattern matching and exclusions across 10,000 projects                                |
+| `codspeed-macro`     | CLI graph computation across 11,100 projects, cold/warm with daemon on/off, plus cached task output restoration |
+
+The macro suite creates 10 namespaced copies of the checked-in fixture in each temporary workspace.
+Project names and implicit dependencies stay within their copy.
+It invokes the built Nx CLI directly, without downloading a workspace
+or benchmarking a published Nx version.
+Each walltime case takes 30 samples after one warmup iteration.
+
+- Cold cases reset Nx before each sample, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
+- Warm cases issue five untimed graph requests in their measurement workspace as well as their separate warmup workspace. Daemon cases fail if Nx falls back to daemonless execution.
+- The cached task case populates the local cache first and removes outputs before each sample.
+  It then checks that all 11,100 tasks restore their outputs from cache.
+  Task parallelism is fixed at one.
+- CLI stdout goes to a file outside the watched workspace.
+  Node writes synchronously to files, avoiding truncated output when a process exits.
+  Timing includes output capture and reading, but excludes graph and cache validation.
+- Macro Nx processes use `--initial-old-space-size=256` with
+  `--min-semi-space-size=64 --max-semi-space-size=64`.
+  The larger initial heap trades memory for fewer early garbage collections.
+  On Node 24, `--external-memory-accounted-in-global-limit` counts external allocations
+  against the global heap budget instead of a separate external-memory limit.
+- `--no-concurrent-recompilation` makes optimizing compiler jobs synchronous.
+  JIT optimization remains enabled.
+- Nx Cloud is disabled.
+  Daemon status checks use `NX_USE_LOCAL=true` to avoid fetching
+  `nx@latest` during measurements.
+  Each case owns its cache and daemon and removes its temporary workspace on completion.
+
+### CI and profiles
+
+`.github/workflows/codspeed.yml` runs on pull requests, pushes to `master`, and manual dispatches. It measures the two microbenchmarks with CPU simulation and all five macrobenchmarks with walltime on the `codspeed-macro-x64-ryzen-9950x-ubuntu-24-04` runner. Both jobs use CodSpeed runner v5.3.1.
+
+The workflow pins Node 24 and the CodSpeed Node plugins. The plugins currently use `6.0.0-beta.2` for Node 22/24 and Vite 8 support. The Tinybench entry point relaunches Node with the V8 flags required by the plugin when instrumentation is enabled. The macro preload forwards profiling flags to the Nx daemon and plugin processes. Walltime keeps the JIT enabled. Rust builds retain debug information for native source locations.
+
+Child-process V8 logs and JIT dumps stay outside the temporary workspace so profiling cannot trigger daemon graph rebuilds. They remain available after fixture cleanup for symbolication.
+
+CodSpeed collects profiles automatically. With the pinned plugin, walltime profiles cover the entire sampling loop, including per-sample reset and validation hooks. Reported latency samples exclude those hooks.
+
+Download the workflow's `codspeed-macro-walltime-*` artifact to compare `results-codspeed-macro.json` between repeated runs of the same commit. The report contains each case's minimum, mean, standard deviation, and sample count. Vitest omits individual samples from its JSON report.
+
+For walltime stability, calculate the coefficient of variation (CV) across per-run minima: divide their sample standard deviation by their mean and multiply by 100. Keep the sample count, runner label, and Node version fixed. Increasing the sample count can lower the minimum without making the code faster, so establish a new baseline when changing it.
+
+The first successful `master` run establishes the baseline for that repository. A fork's baseline doesn't replace the upstream baseline. Upstream needs a successful run after the workflow lands.
