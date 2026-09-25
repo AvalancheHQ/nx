@@ -78,17 +78,23 @@ pnpm nx run-many -p benchmarks -t codspeed-micro,codspeed-tinybench,codspeed-mac
 
 These targets build the local Nx package first and never cache benchmark results. The existing hyperfine targets remain independent.
 
-| Target               | Workload                                                                                                       |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `codspeed-micro`     | Vitest project matching across 2,000 projects, including tags, exclusions, and directories                     |
-| `codspeed-tinybench` | Tinybench `projectsToRun` pattern matching and exclusions across 10,000 projects                               |
-| `codspeed-macro`     | CLI graph computation across 1,110 projects, cold/warm with daemon on/off, plus cached task output restoration |
+| Target               | Workload                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `codspeed-micro`     | Vitest project matching across 2,000 projects, including tags, exclusions, and directories                      |
+| `codspeed-tinybench` | Tinybench `projectsToRun` pattern matching and exclusions across 10,000 projects                                |
+| `codspeed-macro`     | CLI graph computation across 11,100 projects, cold/warm with daemon on/off, plus cached task output restoration |
 
-The macro suite copies the checked-in fixture into temporary workspaces and invokes the built Nx CLI directly. It doesn't download a workspace or benchmark a published Nx version. Each walltime case takes 30 samples after one warmup iteration.
+The macro suite creates 10 namespaced copies of the checked-in fixture in each temporary workspace.
+Project names and implicit dependencies stay within their copy.
+It invokes the built Nx CLI directly, without downloading a workspace
+or benchmarking a published Nx version.
+Each walltime case takes 30 samples after one warmup iteration.
 
 - Cold cases reset Nx before each sample, outside the timer. “Cold” refers to Nx caches, not the OS page cache.
 - Warm cases issue five untimed graph requests in their measurement workspace as well as their separate warmup workspace. Daemon cases fail if Nx falls back to daemonless execution.
-- The cached task case populates the local cache first, removes outputs before each sample, then checks that all 1,110 tasks restore their outputs from cache. Task parallelism is fixed at one.
+- The cached task case populates the local cache first and removes outputs before each sample.
+  It then checks that all 11,100 tasks restore their outputs from cache.
+  Task parallelism is fixed at one.
 - Nx Cloud is disabled.
   Daemon status checks use `NX_USE_LOCAL=true` to avoid fetching
   `nx@latest` during measurements.
