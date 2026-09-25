@@ -103,6 +103,8 @@ Each walltime case takes 30 samples after one warmup iteration.
   The larger initial heap trades memory for fewer early garbage collections.
   On Node 24, `--external-memory-accounted-in-global-limit` counts external allocations
   against the global heap budget instead of a separate external-memory limit.
+- `--no-concurrent-recompilation` makes optimizing compiler jobs synchronous.
+  JIT optimization remains enabled.
 - Nx Cloud is disabled.
   Daemon status checks use `NX_USE_LOCAL=true` to avoid fetching
   `nx@latest` during measurements.
