@@ -1,10 +1,12 @@
 import { getV8Flags } from '@codspeed/core';
 import { execFileSync } from 'node:child_process';
 import {
+  closeSync,
   cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -52,6 +54,8 @@ export const cachedTasksCommand = [
 
 export class BenchmarkWorkspace {
   readonly root: string;
+  private readonly scratchDirectory: string;
+  private readonly outputFile: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly outputDirectories: string[] = [];
   private closed = false;
@@ -70,7 +74,9 @@ export class BenchmarkWorkspace {
         `Build the local nx package before benchmarking: ${nxCli}`
       );
     }
-    this.root = mkdtempSync(join(tmpdir(), 'nx-cs-'));
+    this.scratchDirectory = mkdtempSync(join(tmpdir(), 'nx-cs-'));
+    this.root = join(this.scratchDirectory, 'workspace');
+    this.outputFile = join(this.scratchDirectory, 'stdout');
     this.env = {
       ...process.env,
       NX_WORKSPACE_ROOT_PATH: this.root,
@@ -84,7 +90,7 @@ export class BenchmarkWorkspace {
       NX_CACHE_DIRECTORY: join(this.root, '.nx/cache'),
       NX_WORKSPACE_DATA_DIRECTORY: join(this.root, '.nx/workspace-data'),
       NX_NATIVE_FILE_CACHE_DIRECTORY: join(this.root, '.nx/native'),
-      NX_SOCKET_DIR: join(this.root, '.nx/s'),
+      NX_SOCKET_DIR: join(this.scratchDirectory, 's'),
       NX_DAEMON_VERBOSE_LOGGING: 'false',
       NX_VERBOSE_LOGGING: 'false',
       NX_PERF_LOGGING: 'false',
@@ -104,6 +110,7 @@ export class BenchmarkWorkspace {
 
     process.once('exit', this.onExit);
     try {
+      mkdirSync(this.root);
       for (const file of ['nx.json', 'lorem.md', '.gitignore']) {
         cpSync(join(fixtureSource, file), join(this.root, file));
       }
@@ -133,21 +140,29 @@ export class BenchmarkWorkspace {
         throw new Error(`Expected ${projectCount} fixture projects`);
       }
     } catch (error) {
-      rmSync(this.root, { recursive: true, force: true });
+      rmSync(this.scratchDirectory, { recursive: true, force: true });
       process.removeListener('exit', this.onExit);
       throw error;
     }
   }
 
   run(args: string[]): string {
-    return execFileSync(process.execPath, [...nodeArgs, nxCli, ...args], {
-      cwd: this.root,
-      env: this.env,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 300_000,
-      maxBuffer: 32 * 1024 * 1024,
-    });
+    // File-backed stdout is synchronous in Node on POSIX. Keep it outside the
+    // watched workspace and retain the complete output for cache validation.
+    const stdout = openSync(this.outputFile, 'w');
+    try {
+      execFileSync(process.execPath, [...nodeArgs, nxCli, ...args], {
+        cwd: this.root,
+        env: this.env,
+        encoding: 'utf8',
+        stdio: ['ignore', stdout, 'pipe'],
+        timeout: 300_000,
+        maxBuffer: 32 * 1024 * 1024,
+      });
+      return readFileSync(this.outputFile, 'utf8');
+    } finally {
+      closeSync(stdout);
+    }
   }
 
   reset(): void {
@@ -208,7 +223,7 @@ export class BenchmarkWorkspace {
     if (this.closed) return;
     // Do not delete a live daemon's process record if stopping it fails.
     this.stopDaemon();
-    rmSync(this.root, { recursive: true, force: true });
+    rmSync(this.scratchDirectory, { recursive: true, force: true });
     this.closed = true;
     process.removeListener('exit', this.onExit);
   }
