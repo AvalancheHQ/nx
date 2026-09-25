@@ -29,6 +29,10 @@ nodeArgs.push(
   '--min-semi-space-size=64',
   '--max-semi-space-size=64'
 );
+// Node 22 lacks this flag. Charge IPC buffers to the global memory budget.
+if (process.versions.node.startsWith('24.')) {
+  nodeArgs.push('--external-memory-accounted-in-global-limit');
+}
 if (nodeArgs.includes('--perf-prof')) {
   // Profiler writes must not invalidate the daemon's watched graph, and the
   // files must survive fixture cleanup until CodSpeed symbolizes the run.
