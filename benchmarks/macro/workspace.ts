@@ -23,6 +23,8 @@ const nxCli = join(nxPackage, 'dist/bin/nx.js');
 const fixtureCopies = 10;
 export const projectCount = 1110 * fixtureCopies;
 const nodeArgs = getV8Flags();
+// Keep optimizing JIT enabled, but remove background compiler scheduling.
+nodeArgs.push('--no-concurrent-recompilation');
 // Limit early heap growth in the short-lived CLI processes for this fixture.
 nodeArgs.push(
   '--initial-old-space-size=256',
