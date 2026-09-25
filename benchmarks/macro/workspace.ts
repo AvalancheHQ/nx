@@ -75,6 +75,8 @@ export class BenchmarkWorkspace {
       NX_WORKSPACE_ROOT_PATH: this.root,
       NX_DAEMON: String(daemon),
       NX_NO_CLOUD: 'true',
+      // Keep daemon status checks local; fetching nx@latest adds unrelated work.
+      NX_USE_LOCAL: 'true',
       NX_SKIP_NX_CACHE: 'false',
       NX_SKIP_REMOTE_CACHE: 'true',
       NX_CACHE_PROJECT_GRAPH: 'true',
