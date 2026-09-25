@@ -95,6 +95,9 @@ Each walltime case takes 30 samples after one warmup iteration.
 - The cached task case populates the local cache first and removes outputs before each sample.
   It then checks that all 11,100 tasks restore their outputs from cache.
   Task parallelism is fixed at one.
+- CLI stdout goes to a file outside the watched workspace.
+  Node writes synchronously to files, avoiding truncated output when a process exits.
+  Timing includes output capture and reading, but excludes graph and cache validation.
 - Nx Cloud is disabled.
   Daemon status checks use `NX_USE_LOCAL=true` to avoid fetching
   `nx@latest` during measurements.
