@@ -18,7 +18,8 @@ import { fileURLToPath } from 'node:url';
 const fixtureSource = fileURLToPath(new URL('../', import.meta.url));
 const nxPackage = fileURLToPath(new URL('../../packages/nx/', import.meta.url));
 const nxCli = join(nxPackage, 'dist/bin/nx.js');
-const projectCount = 1110;
+const fixtureCopies = 10;
+export const projectCount = 1110 * fixtureCopies;
 const nodeArgs = getV8Flags();
 if (nodeArgs.includes('--perf-prof')) {
   // Profiler writes must not invalidate the daemon's watched graph, and the
@@ -106,13 +107,18 @@ export class BenchmarkWorkspace {
       for (const file of ['nx.json', 'lorem.md', '.gitignore']) {
         cpSync(join(fixtureSource, file), join(this.root, file));
       }
-      cpSync(join(fixtureSource, 'packages'), join(this.root, 'packages'), {
-        recursive: true,
-        filter: (source) =>
-          !['dist', 'copy-out', 'node_modules', '.nx'].includes(
-            basename(source)
-          ),
-      });
+      for (let copy = 0; copy < fixtureCopies; copy++) {
+        const namespace = `workspace-${copy}`;
+        const destination = join(this.root, 'packages', namespace);
+        cpSync(join(fixtureSource, 'packages'), destination, {
+          recursive: true,
+          filter: (source) =>
+            !['dist', 'copy-out', 'node_modules', '.nx'].includes(
+              basename(source)
+            ),
+        });
+        this.prepareProjects(destination, namespace);
+      }
       const { version } = JSON.parse(
         readFileSync(join(nxPackage, 'package.json'), 'utf8')
       );
@@ -123,7 +129,6 @@ export class BenchmarkWorkspace {
       );
       mkdirSync(join(this.root, 'node_modules'));
       symlinkSync(nxPackage, join(this.root, 'node_modules/nx'), 'dir');
-      this.collectOutputDirectories(join(this.root, 'packages'));
       if (this.outputDirectories.length !== projectCount) {
         throw new Error(`Expected ${projectCount} fixture projects`);
       }
@@ -217,13 +222,22 @@ export class BenchmarkWorkspace {
     });
   }
 
-  private collectOutputDirectories(directory: string): void {
-    if (existsSync(join(directory, 'project.json'))) {
+  private prepareProjects(directory: string, namespace: string): void {
+    const projectFile = join(directory, 'project.json');
+    if (existsSync(projectFile)) {
+      const project = JSON.parse(readFileSync(projectFile, 'utf8'));
+      project.name = `${namespace}-${project.name}`;
+      if (project.implicitDependencies) {
+        project.implicitDependencies = project.implicitDependencies.map(
+          (dependency: string) => `${namespace}-${dependency}`
+        );
+      }
+      writeFileSync(projectFile, JSON.stringify(project));
       this.outputDirectories.push(join(directory, 'copy-out'));
     }
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) {
-        this.collectOutputDirectories(join(directory, entry.name));
+        this.prepareProjects(join(directory, entry.name), namespace);
       }
     }
   }

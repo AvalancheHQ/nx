@@ -3,6 +3,7 @@ import {
   BenchmarkWorkspace,
   cachedTasksCommand,
   graphCommand,
+  projectCount,
 } from './workspace';
 
 // Vitest uses its bundled Tinybench 2.x, independently of the standalone
@@ -88,7 +89,7 @@ function cliBenchmark(
   });
 }
 
-describe('nx macro / 1110 projects', () => {
+describe(`nx macro / ${projectCount} projects`, () => {
   cliBenchmark('graph cold / daemon=false', { daemon: false, cold: true });
   cliBenchmark('graph cold / daemon=true', { daemon: true, cold: true });
   cliBenchmark('graph warm / daemon=false', { daemon: false });
