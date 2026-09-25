@@ -23,6 +23,12 @@ const nxCli = join(nxPackage, 'dist/bin/nx.js');
 const fixtureCopies = 10;
 export const projectCount = 1110 * fixtureCopies;
 const nodeArgs = getV8Flags();
+// Limit early heap growth in the short-lived CLI processes for this fixture.
+nodeArgs.push(
+  '--initial-old-space-size=256',
+  '--min-semi-space-size=64',
+  '--max-semi-space-size=64'
+);
 if (nodeArgs.includes('--perf-prof')) {
   // Profiler writes must not invalidate the daemon's watched graph, and the
   // files must survive fixture cleanup until CodSpeed symbolizes the run.

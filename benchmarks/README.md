@@ -98,6 +98,9 @@ Each walltime case takes 30 samples after one warmup iteration.
 - CLI stdout goes to a file outside the watched workspace.
   Node writes synchronously to files, avoiding truncated output when a process exits.
   Timing includes output capture and reading, but excludes graph and cache validation.
+- Macro Node processes use `--initial-old-space-size=256` with
+  `--min-semi-space-size=64 --max-semi-space-size=64`.
+  The larger initial heap trades memory for fewer early garbage collections.
 - Nx Cloud is disabled.
   Daemon status checks use `NX_USE_LOCAL=true` to avoid fetching
   `nx@latest` during measurements.
