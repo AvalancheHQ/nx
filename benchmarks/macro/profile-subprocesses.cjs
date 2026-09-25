@@ -1,10 +1,9 @@
 const childProcess = require('node:child_process');
 
-// Nx deliberately starts daemons/plugin workers with fresh argv. Preserve the
-// benchmark's CodSpeed V8 flags in those descendants too: otherwise their work
-// has no useful JS symbols, and simulation loses its deterministic V8 settings.
-// Do not use NODE_OPTIONS: it may contain runner instrumentation already, and
-// several simulation flags are only legal on the Node command line.
+// Nx starts daemons and plugin workers with fresh argv. Preserve the benchmark's
+// V8 profiling and heap flags in those descendants.
+// Keep NODE_OPTIONS intact because it can contain runner instrumentation;
+// some V8 options are only accepted on the Node command line.
 const spawn = childProcess.spawn;
 const profilingArgs = process.execArgv;
 childProcess.spawn = function (command, args, options) {
